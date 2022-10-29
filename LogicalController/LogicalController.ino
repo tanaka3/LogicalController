@@ -181,6 +181,7 @@ void loop() {
       if(logicType > 2){
         logicType = 0;
       }
+      beforeController = -1;
       
     }
     drawViewBackground(ctlMode, isRnd, logicType, notFlag);    
@@ -190,6 +191,7 @@ void loop() {
     if(!ctlMode){
       notFlag = !notFlag;
     }
+    beforeController = -1;
     drawViewBackground(ctlMode, isRnd, logicType, notFlag);
   }
   // コントローラーモードの切り替え
