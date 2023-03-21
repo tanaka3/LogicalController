@@ -6,11 +6,9 @@
 #include <M5Core2.h>
 #include <M5GFX.h>
 #include <NESpad.h>
-#include "AudioFileSourceSD.h"
-#include "AudioGeneratorWAV.h"
-#include "AudioOutputI2S.h"
 #include <driver/i2s.h>
 
+#include "image.h"
 
 #define IN0 32  //入力端子
 #define IN1 33
@@ -34,30 +32,30 @@ M5GFX display;
 
 // 画像の情報
 typedef struct _img {
-  char *path;   
+  const unsigned char *img;   
   uint8_t width;
   uint8_t height;
 } Img;
 
 // アイコンの情報
 Img icons[] = {
-      {"/img/icon/AND.png", 233, 139},
-      {"/img/icon/OR.png", 233, 134},
-      {"/img/icon/XOR.png", 233, 125},
-      {"/img/icon/NAND.png", 233, 130},
-      {"/img/icon/NOR.png", 233, 127},
-      {"/img/icon/XNOR.png", 233, 119},
-    };
+      {ICON_AND, 233, 139},
+      {ICON_OR, 233, 134},
+      {ICON_XOR, 233, 125},
+      {ICON_NAND, 233, 130},
+      {ICON_NOR, 233, 127},
+      {ICON_XNOR, 233, 119},
+};
 
 // ロゴの情報
 Img logos[] = {
-      {"/img/logo/AND.png", 60, 22},
-      {"/img/logo/OR.png", 37, 21},
-      {"/img/logo/XOR.png", 58, 22},
-      {"/img/logo/NAND.png", 80, 22},
-      {"/img/logo/NOR.png", 58, 22},
-      {"/img/logo/XNOR.png", 80, 20},
-    };
+      {LOGO_AND, 60, 22},
+      {LOGO_OR, 37, 21},
+      {LOGO_XOR, 58, 22},
+      {LOGO_NAND, 80, 22},
+      {LOGO_NOR, 58, 22},
+      {LOGO_XNOR, 80, 20},
+};
 
 const uint8_t ButtonMap[4] ={ NES_A, NES_B,
                               NES_SELECT, NES_START };
@@ -68,7 +66,7 @@ const uint8_t PadMap[4] ={ NES_UP, NES_DOWN,
 bool notFlag = false;
 bool ctlMode = false;
 bool isRnd = false;
-bool isTouch = false;
+uint8_t isTouch = 0;
 uint8_t logicType = 0;
 uint8_t randButtonMap[4];
 uint8_t randPadMap[4];
@@ -86,7 +84,7 @@ void setup() {
   display.fillScreen(TFT_BACKGROUND);
   display.fillRect(10, 10,  100, 40, TFT_BASEGROUND);
   display.fillRect(10, 40,  300, 190, TFT_BASEGROUND);
-  display.drawPngFile(SD, "/img/logo/TITLE.png", 20, 61);
+  display.drawPng(LOGO_TITLE, sizeof(LOGO_TITLE), 20, 61);
 
   delay(3000);
 
@@ -201,24 +199,51 @@ void loop() {
 
   }
   
-  if( M5.Touch.ispressed() && !isTouch){
+  if( M5.Touch.ispressed() && isTouch == 0){
     TouchPoint_t point = M5.Touch.getPressPoint();
-      if(point.y >70 && point.y < 250 ){
-        isTouch = true;
+    if(point.y >70 && point.y < 250 ){
+      if(point.x < 160){
+        isTouch = 1;
       }
+      else{
+        isTouch = 2;
+      }        
+    }
   }
-  else if(!M5.Touch.ispressed() && isTouch){
-      isTouch = false;
-      isRnd = !isRnd;
-      generateMap(isRnd);
-      drawRndIcon(isRnd);
+  else if(!M5.Touch.ispressed() && isTouch != 0){
+    switch(isTouch){
+      case 1:
+        isRnd = !isRnd;
+        generateMap(isRnd);
+        drawRndIcon(isRnd);
+        break;
+      case 2:
+        switchReset();
+        break;
+    }
 
+    isTouch = 0;
   }
 
   display.display();
 }
 
+void switchReset(){
 
+Serial.println("reset");
+ //ボタン系
+  byte btnCmd[4];
+  memset(btnCmd, 0x00, 4);  
+  btnCmd[0] = 0xc1;
+  btnCmd[1] = 5;
+
+  btnCmd[2] |= 0x40;
+  btnCmd[2] |= 0x80;
+
+  btnCmd[3] = 0;
+
+  Serial2.write(btnCmd, 4);  
+}
 
 // & and
 // | or
@@ -451,21 +476,40 @@ void drawViewBackground(bool ctlMode, bool isRnd, uint8_t mode, bool notFlag){
   display.fillRect(10, 40,  300, 190, TFT_BASEGROUND);
 
   display.fillRect(110, 10, 210, 40, TFT_BACKGROUND);
-  display.drawPngFile(SD, logos[flag].path, 185 + (60 - logos[flag].width)/2 , 17); 
+
+  int x = 185 + (60 - logos[flag].width)/2;
+  int y = 17;
+  switch(flag){
+    case 0: display.drawPng(LOGO_AND, sizeof(LOGO_AND), x , y); break;
+    case 1: display.drawPng(LOGO_OR, sizeof(LOGO_OR), x , y); break;
+    case 2: display.drawPng(LOGO_XOR, sizeof(LOGO_XOR), x , y); break; 
+    case 3: display.drawPng(LOGO_NAND, sizeof(LOGO_NAND), x , y); break;
+    case 4: display.drawPng(LOGO_NOR, sizeof(LOGO_NOR), x , y); break;
+    case 5: display.drawPng(LOGO_XNOR, sizeof(LOGO_XNOR), x , y); break; 
+  }
 
   if(isRnd){
     // 33-28
-    display.drawPngFile(SD, "/img/ICON/RANDOM.png", 44, 16);
+    display.drawPng(ICON_RANDOM, sizeof(ICON_RANDOM), 44, 16);
   }
 
   if(ctlMode){
     uint8_t flag = mode + (notFlag ?  3: 0);
-    display.drawPngFile(SD, "/img/frame/CONTROLLER.png", 13, 70);
+    display.drawPng(FRAME_CONTROLLER, sizeof(FRAME_CONTROLLER), 13, 70);
   }
   else{
-    display.drawPngFile(SD, "/img/frame/MENU.png", 25, 195);
+    display.drawPng(FRAME_MENU, sizeof(FRAME_MENU), 25, 195);
     display.fillRect(25, 60, 260, 120, TFT_BASEGROUND);
-    display.drawPngFile(SD, icons[flag].path, 160 -icons[flag].width / 2 , 51  + (139 - icons[flag].height) /2); 
+    int x = 160 -icons[flag].width / 2;
+    int y =  51  + (139 - icons[flag].height) /2;
+    switch(flag){
+      case 0: display.drawPng(ICON_AND, sizeof(ICON_AND), x , y); break;
+      case 1: display.drawPng(ICON_OR, sizeof(ICON_OR), x , y); break;
+      case 2: display.drawPng(ICON_XOR, sizeof(ICON_XOR), x , y); break; 
+      case 3: display.drawPng(ICON_NAND, sizeof(ICON_NAND), x , y); break;
+      case 4: display.drawPng(ICON_NOR, sizeof(ICON_NOR), x , y); break;
+      case 5: display.drawPng(ICON_XNOR, sizeof(ICON_XNOR), x , y); break; 
+    }
   }
   
   display.endWrite();
@@ -476,7 +520,7 @@ void drawRndIcon(bool isRnd){
   display.fillRect(10, 10,  100, 40, TFT_BASEGROUND);
 
   if(isRnd){
-    display.drawPngFile(SD, "/img/ICON/RANDOM.png", 44, 16);
+    display.drawPng(ICON_RANDOM, sizeof(ICON_RANDOM), 44, 16);
   }
 }
 

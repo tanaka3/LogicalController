@@ -52,7 +52,7 @@ M5GFX display;
 
 // 画像の情報
 typedef struct _img {
-  const unsigned char *img;   
+  const unsigned char *img;
   uint8_t width;
   uint8_t height;
 } Img;
